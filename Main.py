@@ -1,31 +1,56 @@
 from tkinter import *
 from tkinter import PhotoImage
+from tkinter.messagebox import showinfo, showerror, showwarning
 
 class MainMenu:
+    def __init__(self):
+        self.window = Tk()
+        self.window.geometry("1024x768")
+        self.window.title("Glow Getter")
+        
+        screen_width = self.window.winfo_screenwidth()
+        screen_height = self.window.winfo_screenheight()
+        window_width = 1024
+        window_height = 768
+        position_top = int(screen_height / 2 - window_height / 2)
+        position_right = int(screen_width / 2 - window_width / 2)
+        self.window.geometry(f"{window_width}x{window_height}+{position_right}+{position_top}")
+        
+        self.window.resizable(False, False)
+        
+        self.background = PhotoImage(file="assets/background.png")
+        self.button_image = PhotoImage(file="assets/login.png")
+        self.button1_image = PhotoImage(file="assets/register.png")
+        
+        self.background_label = Label(self.window, image=self.background)
+        self.background_label.pack()
+        
+        self.username_entry = Entry(self.window, width=30)
+        self.username_entry.place(x=389, y=352)
+        self.username_entry.config(font=("Arial"))
+        
+        self.password_entry = Entry(self.window, width=30, show="*")
+        self.password_entry.place(x=389, y=437)
+        self.password_entry.config(font=("Arial"))
+        
+        self.login_button = Button(self.window, image=self.button_image, command=self.login, border=0)
+        self.login_button.place(x=440, y=512)
+        
+        
+        self.window.mainloop()
     
-    def login():
-        username = username.get()
-        password = password.get()
-    window = Tk()
-    window.geometry("1024x768")
-    window.title("Glow Getter")
+    
+    def login(self):
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+        if username == '' or password == '':
+            showerror("Error", "Please enter a valid username and password")
+        else:
+            print("Login successful")
+            
+    def shopping_window(self):
+        pass
 
-    background = PhotoImage(file="assets/background.png")
-    button_image = PhotoImage(file="assets/login.png")
-    
-    background_label = Label(window, image=background)
-    background_label.pack()
-
-    username = Entry(window, width=30)
-    username.place(x=389, y=352)
-    username.config(font=("Arial"))
-    
-    password = Entry(window, width=30, bg="white", show="*")
-    password.place(x=389, y=437)
-    password.config(font=("Arial"), fg="black")
-    
-    login_button = Button(window, border=0, image=button_image, command=login)
-    login_button.place(x=420, y=512)
-    login_button.config(font=("Arial"), bg="white", )
-    
-    window.mainloop()
+# Create an instance of MainMenu to run the application
+if __name__ == "__main__":
+    MainMenu()
