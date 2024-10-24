@@ -106,7 +106,7 @@ class ShoppingWindow():
 
 class ChatWindow:
     def __init__(self):
-        self.window = Toplevel()
+        self.window = Tk()
         self.window.geometry("600x400")
         self.window.title("Glow Getter : Message Staff")
         self.window.resizable(False, False)
@@ -136,5 +136,5 @@ class ChatWindow:
 
 
 if __name__ == "__main__":
-    ChatWindow()  
+    MainMenu()  
     
