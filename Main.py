@@ -1,8 +1,7 @@
 from tkinter import *
 from tkinter import PhotoImage
 from tkinter.messagebox import showinfo, showerror, showwarning
-from openpyxl import load_workbook, Workbook
-import os
+from database import DatabaseHandler
 
 class MainMenu:
     def __init__(self):
@@ -37,35 +36,20 @@ class MainMenu:
         self.login_button = Button(self.window, image=self.button_image, command=self.login, border=0)
         self.login_button.place(x=440, y=512)
         
+        self.database_handler = DatabaseHandler()
         
         self.window.mainloop()
     
-    
     def login(self):
-        
         username = self.username_entry.get()
         password = self.password_entry.get()
         if username == '' or password == '' and username == ' ' or password == ' ':
             showerror("Error", "Please enter a valid username and password")
         else:
-            self.save_login(username, password)
+            self.database_handler.add_user(username, password)
             self.window.destroy()
             ShoppingWindow(username)
-    def save_login(self, username, password):
-        file_path = 'database/customers.xlsx'
-        
-        if os.path.exists(file_path):
-            wb = load_workbook(file_path)
-            sheet = wb.active
-        else:
-            wb = Workbook()
-            sheet = wb.active
-            sheet.append(['Username', 'Password'])
             
-        sheet.append([username, password])
-        wb.save(file_path)
-        
-
 class ShoppingWindow():
     def __init__(self, username):
         self.window = Tk()
@@ -106,17 +90,9 @@ class ShoppingWindow():
 
 class ChatWindow:
     def __init__(self):
-        self.window = Tk()
+        self.window = Toplevel()
         self.window.geometry("600x400")
         self.window.title("Glow Getter : Message Staff")
-        self.window.resizable(False, False)
-        screen_width = self.window.winfo_screenwidth()
-        screen_height = self.window.winfo_screenheight()
-        window_width = 600
-        window_height = 400
-        position_top = int(screen_height / 2 - window_height / 2)
-        position_right = int(screen_width / 2 - window_width / 2)
-        self.window.geometry(f"{window_width}x{window_height}+{position_right}+{position_top}")
         self.window.resizable(False, False)
         
         self.chat_background1 = PhotoImage(file="assets/chat_background.png")
@@ -130,11 +106,7 @@ class ChatWindow:
         self.chat_entry.pack(side=LEFT, padx=10)
         
         self.send_button = Button(self.window, text="Send")
-        self.send_button.pack(pady=10)
+        self.send_button.pack()
         
-        self.window.mainloop()
-
-
 if __name__ == "__main__":
     MainMenu()  
-    
