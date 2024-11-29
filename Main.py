@@ -48,14 +48,11 @@ class MainMenu:
         StaffLoginWindow()
 
     def login(self):
-        username = self.username_entry.get()
-        password = self.password_entry.get()
-        if username == '' or password == '' and username == ' ' or password == ' ':
+        username = self.username_entry.get().strip()
+        password = self.password_entry.get().strip()
+        
+        if not username or not password:
             showerror("Error", "Please enter a valid username and password")
-        elif password == '':
-            showerror("Error", "Please enter a valid password") 
-        elif username == '':
-            showerror("Error", "Please enter a valid username")
         elif self.database_handler.validate_user(username, password):
             self.window.destroy()
             ShoppingWindow(username)
@@ -110,6 +107,10 @@ class StaffLoginWindow:
             showinfo("Login Successful", "Welcome, staff member!")
             self.window.destroy()
             StaffDashboard(username)
+        elif username == '' or username == ' ':
+            showerror("Error", "Please enter a valid username")
+        elif password == '' or password == ' ':
+            showerror("Error", "Please enter a valid password")
         else:
             showerror("Error", "Invalid username or password")
 
@@ -223,7 +224,7 @@ class StaffDashboard:
         selected_product = self.product_quantity_listbox.get(ACTIVE)
         if selected_product:
             product_name = selected_product.split(":")[0]
-            product_id = self.db_handler.get_products(product_name)
+            product_id = self.db_handler.get_product_id_by_name(product_name)
             if product_id is not None:
                 self.db_handler.remove_product(product_id)
                 self.load_product_quantities()
@@ -231,14 +232,21 @@ class StaffDashboard:
     def add_product(self):
         name = simpledialog.askstring("Add Product", "Enter product name:")
         if name:
-            price = simpledialog.askfloat("Add Product", "Enter product price:")
-            if price is not None:
-                quantity = simpledialog.askinteger("Add Product", "Enter product quantity:")
-                if quantity is not None:
-                    image_path = simpledialog.askstring("Add Product", "Enter image path:")
-                    if image_path:
-                        self.db_handler.add_product(name, price, quantity, image_path)
-                        self.load_product_quantities()
+            while True:
+                price = simpledialog.askfloat("Add Product", "Enter product price:")
+                if price is not None:
+                    if price < 0:
+                        showerror("Error", "Price must be a positive number")
+                    else:
+                        break
+                else:
+                    return  # User cancelled the input dialog
+            quantity = simpledialog.askinteger("Add Product", "Enter product quantity:")
+            if quantity is not None:
+                image_path = simpledialog.askstring("Add Product", "Enter image path:")
+                if image_path:
+                    self.db_handler.add_product(name, price, quantity, image_path)
+                    self.load_product_quantities()
     
     def reply_message(self):
         try:
@@ -250,7 +258,7 @@ class StaffDashboard:
                 self.db_handler.insert_response(message_id, self.username, response)
                 showinfo("Reply Sent", "Your reply has been sent.")
         except IndexError:
-            showerror("Error", "Failed to parse the selected message.")
+            showerror("Error", "Failed to send message.")
 
     def exit(self):
         self.window.destroy()
@@ -496,14 +504,19 @@ class ChatWindow:
         if message.strip():
             user_id = self.db_handler.get_user_id(self.username)
             self.db_handler.insert_message(user_id, message)
-            showinfo("Message Sent", "Your message has been sent and stored in the database.")
+            showinfo("Message Sent", "Your message has been sent to staff.")
             self.chat_box.delete("1.0", END)
-            self.load_replies()  # Reload replies to show the new message
+            self.load_replies()
         else:
             showwarning("Empty Message", "Cannot send an empty message.")
     
     def load_replies(self):
             self.replies_listbox.delete(0, END)
+            user_id = self.db_handler.get_user_id(self.username)
+            replies = self.db_handler.getr_replies(user_id)
+            for reply in replies:
+                message_id, message, reply_text, timestamp = reply
+                self.replies_listbox.insert(END, f"{timestamp} - {message}: {reply_text}") 
             
     def populate_replies_listbox(self, replies):
         for reply in replies:
@@ -538,4 +551,4 @@ class ChatWindow:
             self.replies_listbox.insert(END, f"{reply_id} - {staff_id}: {text} ({timestamp})")
 
 if __name__ == "__main__":
-    ShoppingWindow("test")
+    MainMenu()

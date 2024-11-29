@@ -1,11 +1,12 @@
 import sqlite3
+import os
 
 class DatabaseHandler:
-    def __init__(self, db_name="app_database.db"):
-        self.connection = sqlite3.connect(db_name)
-        self.cursor = self.connection.cursor()
-        self.create_tables()
-        self.ensure_rating_column()
+    def __init__(self, db_path="__pycache__/app_database.db"):
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+            self.connection = sqlite3.connect(db_path)
+            self.cursor = self.connection.cursor()
+            self.create_tables()
 
     def create_tables(self):
         self.cursor.execute('''
@@ -20,8 +21,8 @@ class DatabaseHandler:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 price REAL NOT NULL,
-                quantity INTEGER NOT NULL DEFAULT 999,
-                image_path TEXT,
+                quantity INTEGER NOT NULL,
+                image_path TEXT NOT NULL,
                 rating REAL DEFAULT 0
             )
         ''')
@@ -58,11 +59,11 @@ class DatabaseHandler:
             )
         ''')
         self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS responses (
+            CREATE TABLE IF NOT EXISTS replies (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 message_id INTEGER NOT NULL,
                 staff_username TEXT NOT NULL,
-                response TEXT NOT NULL,
+                reply TEXT NOT NULL,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (message_id) REFERENCES messages (id)
             )
@@ -90,23 +91,21 @@ class DatabaseHandler:
         return True
     
     def get_user_id(self, username):
-        self.cursor.execute('''
-            SELECT id FROM users
-            WHERE username = ?
-        ''', (username,))
+        self.cursor.execute('SELECT id FROM users WHERE username = ?', (username,))
         result = self.cursor.fetchone()
-        if result:
-            return result[0]
-        else:
-            return None
+        return result[0] if result else None
     
     def validate_user(self, username, password):
-        self.cursor.execute('''
-            SELECT id FROM users
-            WHERE username = ? AND password = ?
-        ''', (username, password))
-        result = self.cursor.fetchone()
-        return result is not None
+        try:
+            self.cursor.execute('SELECT password FROM users WHERE username = ?', (username,))
+            result = self.cursor.fetchone()
+            if result and result[0] == password:
+                return True
+            else:
+                return False
+        except sqlite3.Error as e:
+            print(f"Error validating user: {e}")
+            return False
     
     def get_total_orders(self):
         self.cursor.execute('''
@@ -179,26 +178,34 @@ class DatabaseHandler:
 
     def insert_message(self, user_id, message):
         self.cursor.execute('''
-            INSERT INTO messages (user_id, message)
-            VALUES (?, ?)
+            INSERT INTO messages (user_id, message) VALUES (?, ?)
         ''', (user_id, message))
         self.connection.commit()
 
     def get_messages(self):
         self.cursor.execute('''
-            SELECT messages.id, users.username, messages.message, messages.timestamp
-            FROM messages
-            JOIN users ON messages.user_id = users.id
-            ORDER BY messages.timestamp DESC
+            SELECT m.id, u.username, m.message
+            FROM messages m
+            JOIN users u ON m.user_id = u.id
+            ORDER BY m.timestamp DESC
         ''')
         return self.cursor.fetchall()
 
-    def insert_response(self, message_id, staff_username, response):
+    def insert_response(self, message_id, staff_username, reply):
         self.cursor.execute('''
-            INSERT INTO responses (message_id, staff_username, response)
-            VALUES (?, ?, ?)
-        ''', (message_id, staff_username, response))
+            INSERT INTO replies (message_id, staff_username, reply) VALUES (?, ?, ?)
+        ''', (message_id, staff_username, reply))
         self.connection.commit()
+
+    def get_replies(self, user_id):
+        self.cursor.execute('''
+            SELECT m.id, m.message, r.reply, r.timestamp
+            FROM messages m
+            LEFT JOIN replies r ON m.id = r.message_id
+            WHERE m.user_id = ?
+            ORDER BY m.timestamp DESC, r.timestamp DESC
+        ''', (user_id,))
+        return self.cursor.fetchall()
 
     def get_responses(self, user_id, limit=10, offset=0):
         self.cursor.execute('''
@@ -231,6 +238,11 @@ class DatabaseHandler:
         if result:
             return result[0]
         return None
+
+    def check_products(self):
+        self.cursor.execute('SELECT * FROM products')
+        products = self.cursor.fetchall()
+        return products
 
     def close(self):
         self.connection.close()
