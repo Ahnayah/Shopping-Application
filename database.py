@@ -184,7 +184,7 @@ class DatabaseHandler:
 
     def get_messages(self):
         self.cursor.execute('''
-            SELECT m.id, u.username, m.message
+            SELECT m.id, u.username, m.message, m.timestamp
             FROM messages m
             JOIN users u ON m.user_id = u.id
             ORDER BY m.timestamp DESC
@@ -197,14 +197,15 @@ class DatabaseHandler:
         ''', (message_id, staff_username, reply))
         self.connection.commit()
 
-    def get_replies(self, user_id):
+    def get_replies(self, user_id, limit=10, offset=0):
         self.cursor.execute('''
             SELECT m.id, m.message, r.reply, r.timestamp
             FROM messages m
             LEFT JOIN replies r ON m.id = r.message_id
             WHERE m.user_id = ?
             ORDER BY m.timestamp DESC, r.timestamp DESC
-        ''', (user_id,))
+            LIMIT ? OFFSET ?
+        ''', (user_id, limit, offset))
         return self.cursor.fetchall()
 
     def get_responses(self, user_id, limit=10, offset=0):
@@ -244,5 +245,24 @@ class DatabaseHandler:
         products = self.cursor.fetchall()
         return products
 
+    def update_product_price(self, product_name, new_price):
+        try:
+            self.cursor.execute('UPDATE products SET price = ? WHERE name = ?', (new_price, product_name))
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error updating product price: {e}")
+            return False
+        
     def close(self):
         self.connection.close()
+
+    def get_message_id_by_timestamp_and_user(self, timestamp, username):
+        self.cursor.execute('''
+            SELECT m.id
+            FROM messages m
+            JOIN users u ON m.user_id = u.id
+            WHERE m.timestamp = ? AND u.username = ?
+        ''', (timestamp, username))
+        result = self.cursor.fetchone()
+        return result[0] if result else None

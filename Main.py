@@ -150,7 +150,7 @@ class StaffDashboard:
         self.restock_button = Button(self.window, text="Restock Item", bg='white', fg='black', font=("Arial", 16), command=self.restock_item)
         self.restock_button.place(x=50, y=540)
         
-        self.edit_quantity_button = Button(self.window, text="Edit Quantity", bg='white', fg='black', font=("Arial", 16), command=self.edit_quantity)
+        self.edit_quantity_button = Button(self.window, text="Edit Price", bg='white', fg='black', font=("Arial", 16), command=self.edit_price)
         self.edit_quantity_button.place(x=200, y=540)
         
         self.remove_product_button = Button(self.window, text="Remove Product", bg='white', fg='black', font=("Arial", 16), command=self.remove_product)
@@ -178,8 +178,8 @@ class StaffDashboard:
         self.product_quantity_listbox.delete(0, END)
         products = self.db_handler.get_products()
         for product in products:
-            _, name, _, quantity, _, _ = product
-            self.product_quantity_listbox.insert(END, f"{name}: {quantity}")
+            _, name, price, quantity, _, rating = product
+            self.product_quantity_listbox.insert(END, f"{name}: ${price}: {quantity} qty")
         
     def update_total_orders(self):
         total_orders = self.db_handler.get_total_orders()
@@ -190,7 +190,11 @@ class StaffDashboard:
         messages = self.db_handler.get_messages()
         for message in messages:
             message_id, username, text, timestamp = message
-            self.messages_listbox.insert(END, f"{message_id} - {username}: {text} ({timestamp})")
+            self.messages_listbox.insert(END, f"{timestamp} - {username}: \n{text}")
+
+        h_scrollbar = Scrollbar(self.window, orient=HORIZONTAL, command=self.messages_listbox.xview)
+        self.messages_listbox.config(xscrollcommand=h_scrollbar.set)
+        h_scrollbar.place(x=600, y=520, width=420)
     
     def restock_item(self):
         selected_product = self.product_quantity_listbox.get(ACTIVE)
@@ -200,24 +204,23 @@ class StaffDashboard:
             if quantity is not None:
                 if quantity < 0:
                     showerror("Error", "Quantity must be a positive number")
+                    return
                 if quantity > 999:
                     showerror("Error", "Quantity cannot exceed 999")
                     return
                 self.db_handler.update_product_quantity(product_name, quantity)
                 self.load_product_quantities()
     
-    def edit_quantity(self):
+    def edit_price(self):
         selected_product = self.product_quantity_listbox.get(ACTIVE)
         if selected_product:
             product_name = selected_product.split(":")[0]
-            quantity = simpledialog.askinteger("Edit Quantity", f"Enter new quantity for {product_name}:")
-            if quantity is not None:
-                if quantity < 0:
-                    showerror("Error", "Quantity must be a positive number")
-                if quantity > 999:
-                    showerror("Error", "Quantity cannot exceed 999")
+            price = simpledialog.askfloat("Edit Price", f"Enter new price for {product_name}:")
+            if price is not None:
+                if price < 0:
+                    showerror("Error", "Price must be a positive number")
                     return
-                self.db_handler.update_product_quantity(product_name, quantity)
+                self.db_handler.update_product_price(product_name, price)
                 self.load_product_quantities()
     
     def remove_product(self):
@@ -243,22 +246,35 @@ class StaffDashboard:
                     return  # User cancelled the input dialog
             quantity = simpledialog.askinteger("Add Product", "Enter product quantity:")
             if quantity is not None:
-                image_path = simpledialog.askstring("Add Product", "Enter image path:")
+                if quantity < 0:
+                    showerror("Error", "Quantity must be a positive number")
+                    return
+                if quantity > 999:
+                    showerror("Error", "Quantity cannot exceed 999")
+                    return
+                image_path = simpledialog.askstring("Add Product", "Enter image path (assets/example.png):")
                 if image_path:
                     self.db_handler.add_product(name, price, quantity, image_path)
                     self.load_product_quantities()
     
     def reply_message(self):
-        try:
-            selected_message = self.messages_listbox.get(ACTIVE)
-            message_id = int(selected_message.split(" - ")[0])
-            username = selected_message.split(":")[0].split(" - ")[1]
-            response = simpledialog.askstring("Reply", f"Enter your reply to {username}:")
-            if response:
-                self.db_handler.insert_response(message_id, self.username, response)
-                showinfo("Reply Sent", "Your reply has been sent.")
-        except IndexError:
-            showerror("Error", "Failed to send message.")
+        selected_message = self.messages_listbox.get(ACTIVE)
+        if selected_message:
+            # Extract message_id from the selected message
+            parts = selected_message.split(" - ")
+            timestamp = parts[0]
+            username = parts[1].split(":")[0]
+            message_id = self.db_handler.get_message_id_by_timestamp_and_user(timestamp, username)
+            
+            if message_id is not None:
+                response = simpledialog.askstring("Reply", f"Enter your reply to {username}:")
+                if response:
+                    self.db_handler.insert_response(message_id, self.username, response)
+                    showinfo("Reply Sent", "Your reply has been sent.")
+            else:
+                showerror("Error", "Failed to find the message ID.")
+        else:
+            showerror("Error", "No message selected.")
 
     def exit(self):
         self.window.destroy()
@@ -325,14 +341,14 @@ class ShoppingWindow:
         ChatWindow(self.username)
         
     def load_products(self):
-        self.clear_product_widgets()  # Clear existing product widgets
+        self.clear_product_widgets() # Refresh the UI
         products = self.database_handler.get_products()
         x_position = 320
         y_position = 250
         for product in products:
-            product_id, name, price, quantity, image_path, rating = product  # Ensure the correct number of columns are selected
+            product_id, name, price, quantity, image_path, rating = product 
             
-            # Log the image_path for debugging
+            # Make sure products are properly loading
             print(f"Loading product: {name}, Image path: {image_path}")
             
             if not os.path.exists(image_path):
@@ -347,7 +363,7 @@ class ShoppingWindow:
             
             product_label = Label(self.window, image=product_image)
             product_label.image = product_image
-            product_label.config(width=150, height=150)  # Increase the size of the product image
+            product_label.config(width=150, height=150)  # Size of the product image
             product_label.place(x=x_position, y=y_position)
             self.product_widgets.append(product_label)
             
@@ -379,7 +395,7 @@ class ShoppingWindow:
             rate_button.place(x=x_position + 120, y=y_position + 290)
             self.product_widgets.append(rate_button)
             
-            x_position += 220  # Adjust this value to control the horizontal spacing
+            x_position += 220  # Horizontal spacing
             if x_position > 1000:
                 x_position = 320  # Reset to the starting position
                 y_position += 350  # Move to the next row
@@ -471,6 +487,8 @@ class ChatWindow:
     def __init__(self, username):
         self.username = username
         self.db_handler = DatabaseHandler()
+        self.offset = 0
+        
         self.window = Tk()
         self.window.geometry("600x400")
         self.window.title("Glow Getter : Message Staff")
@@ -488,16 +506,17 @@ class ChatWindow:
         self.replies_listbox = Listbox(self.window, width=50, height=10, font=("Arial", 12))
         self.replies_listbox.place(x=80, y=170)
         
-        self.offset = 0
-        self.load_replies()
-        
-        self.prev_button = Button(self.window, text="Previous", command=self.prev_page)
+        self.prev_button = Button(self.window, text="Previous", command=self.prev_page_action)
         self.prev_button.place(x=80, y=370)
         
-        self.next_button = Button(self.window, text="Next", command=self.next_page)
+        self.next_button = Button(self.window, text="Next", command=self.next_page_action)
         self.next_button.place(x=500, y=370)
         
-        self.window.mainloop() 
+        self.load_replies()
+        self.update_pagination_buttons()
+        
+        self.window.mainloop()
+
 
     def send_message(self):
         message = self.chat_box.get("1.0", "end-1c")
@@ -509,46 +528,38 @@ class ChatWindow:
             self.load_replies()
         else:
             showwarning("Empty Message", "Cannot send an empty message.")
-    
+
     def load_replies(self):
-            self.replies_listbox.delete(0, END)
-            user_id = self.db_handler.get_user_id(self.username)
-            replies = self.db_handler.getr_replies(user_id)
-            for reply in replies:
-                message_id, message, reply_text, timestamp = reply
-                self.replies_listbox.insert(END, f"{timestamp} - {message}: {reply_text}") 
+        self.replies_listbox.delete(0, END)
+        user_id = self.db_handler.get_user_id(self.username)
+        replies = self.db_handler.get_replies(user_id)
+        self.populate_replies_listbox(replies)
+        self.update_pagination_buttons()
             
-    def populate_replies_listbox(self, replies):
-        for reply in replies:
-            for reply in replies:
-                response, timestamp, staff_username = reply
-                self.replies_listbox.insert(END, f"{staff_username}: {response} ({timestamp})")
-            self.update_pagination_buttons()
-    
     def update_pagination_buttons(self):
-            if self.offset > 0:
-                self.prev_button.config(state=NORMAL)
-            else:
-                self.prev_button.config(state=DISABLED)
-            
-            if len(self.db_handler.get_responses(self.db_handler.get_user_id(self.username), limit=10, offset=self.offset + 10)) > 0:
-                self.next_button.config(state=NORMAL)
-            else:
-                self.next_button.config(state=DISABLED)
-    
-    def next_page(self):
-            self.offset += 10
-            self.load_replies()
-    
-    def prev_page(self):
-            self.offset -= 10
-            self.load_replies()
-            self.replies_listbox.delete(0, END)
+        if self.offset > 0:
+            self.prev_button.config(state=NORMAL)
+        else:
+            self.prev_button.config(state=DISABLED)
+        
+        if len(self.db_handler.get_replies(self.db_handler.get_user_id(self.username), limit=10, offset=self.offset + 10)) > 0:
+            self.next_button.config(state=NORMAL)
+        else:
+            self.next_button.config(state=DISABLED)
+
+    def next_page_action(self):
+        self.offset += 10
+        self.load_replies()
+
+    def prev_page_action(self):
+        self.offset -= 10
+        self.load_replies()
 
     def populate_replies_listbox(self, replies):
         for reply in replies:
-            reply_id, staff_id, text, timestamp = reply
-            self.replies_listbox.insert(END, f"{reply_id} - {staff_id}: {text} ({timestamp})")
+            message_id, message, reply_text, timestamp = reply
+            self.replies_listbox.insert(END, f"'{message}': From staff: {reply_text}")
+
 
 if __name__ == "__main__":
     MainMenu()
